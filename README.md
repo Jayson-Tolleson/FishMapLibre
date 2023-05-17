@@ -2,9 +2,10 @@
 MapLibreGL with Python for an expandable fishmap
 
 1. clone into www
-2. handle cert and key
-3. sudo pip3 install *all necessary dependencies or modules
-4. run
+2. open ports 443;8080
+3. handle cert and key
+4. sudo pip3 install *all necessary dependencies or modules
+5. run
    sudo python3 start.py
 
 ![Screenshot from 2023-05-17 04-00-01 (convert io)](https://github.com/Jayson-Tolleson/FishMapLibre/assets/30577311/528f9f44-507b-479a-86af-4ba053b51ec0)
