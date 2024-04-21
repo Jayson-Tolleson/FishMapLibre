@@ -1,14 +1,12 @@
 
 #!/usr/bin/env python3
-import cgitb
-cgitb.enable()
-import cgi
 import time
 import csv
 import requests
 import json
 import subprocess
 import os
+import sys
 from datetime import date, datetime, timedelta
 import geopy
 from geopy.geocoders import Nominatim
@@ -19,6 +17,26 @@ from flask import Flask, Response, request, render_template, redirect, url_for
 
 app = Flask(__name__, static_folder='fishvid')
 app.url_map.strict_slashes = False
+@app.route('/report', methods=['GET', 'POST'])
+
+def report():
+    if request.method == 'POST':
+        file = open("/var/www/fishloclist.csv", "r")
+        csv_reader = csv.reader(file)
+        loc = []
+        for row in csv_reader:
+            loc.append(row)
+        report = str(request.form['report'])
+        locnum = int(request.form['locnum'])
+        loc[locnum].append(report)
+        with open('/var/www/fishloclist.csv', 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(loc)
+            print ('report submited. '+str(loc[locnum]))
+        return """<html><h1>Location:"""+str(locnum)+"""---"""+report+"""</h1></html>"""
+    else:
+        print ('none')
+            
 @app.route('/fishmap')
 def fishmap():
     def output():
@@ -140,14 +158,7 @@ text-align: center;}
 .vidtext {    position: absolute;   top: 5px;   z-index: 10;}
 </style>
 <body><h1>FISHMAP.LFTR.biz</h1><h1>Doppler Map with Fishing Report!!!</h1></body>
-<body>
-<script type="text/javascript" >
-        function go2() {
-            var m3=document.getElementsByName("e");
-            var m4=document.getElementsByName("f");
-            window.location.href = "https://lftr.biz/cgi-bin/report.py" + m3(0).value+"+"+ m4(0).value;
-        }
-</script>"""
+<body>"""
 # open and read lat,lng,report tuple as list in local .csv
         file = open("/var/www/fishloclist.csv", "r")
         csv_reader = csv.reader(file)
@@ -267,7 +278,11 @@ showCompass: true
             fullreport = str(loc[x]).replace('"', '')
             yield """var loc"""+str(x)+""" = ["""+(longitude)+""" , """+(latitude)+"""];"""
             yield """var el"""+str(x)+""" = document.createElement('div');el"""+str(x)+""".id = 'marker';"""
-            yield """var popup"""+str(x)+""" = new maplibregl.Popup({ offset: 25 }).setHTML("<div id='scroll'><h1>Location: ( """ +latitude+ """ , """ +longitude+ """ ) </h1><p> Report: """ +report+ """ </p><p>Current Weather: """ +weathershort+ """ </p><div id='containerpopup'><iframe id='popup' src='https://lftr.biz/cgi-bin/roboweather.py?a="""+latitude+"""&b="""+longitude+""" '></iframe></div><h2>Location Video</h2><video width='320' height='240' controls autoplay src='/fishvid/temp"""+str(x)+""".mp4' type='video/mp4'></video><h1>Submit A New Fishing Report</h1><form action='https://lftr.biz/cgi-bin/report.py' onsubmit='go2();'>Enter Report: <input type='text' name='e' value= 'date, observation, tips & tricks'><br><input name ='f' value= """+str(x)+"""  type='hidden'><input type='submit' value='Submit'> </form><form enctype = 'multipart/form-data' action = 'https://lftr.biz:8084/uploader' method = 'post'><p>Upload File For The Location, ie. whats up on vid....(works on site, not app): <input type = 'file' name = 'file' /><input name ='f' value= """+str(x)+"""  type='hidden'></p><p><input type = 'submit' value = 'Upload' /></p><h3>FULL Report: </h3><h3> """+fullreport+weather+""" </h3></div>");"""
+            yield """var popup"""+str(x)+""" = new maplibregl.Popup({ offset: 25 }).setHTML("<div id='scroll'><h1>Location: ( """ +latitude+ """ , """ +longitude+ """ ) </h1><p> Report: """ +report+ """ </p><p>Current Weather: """ +weathershort+ """ </p><div id='containerpopup'><iframe id='popup' src='https://lftr.biz:8086/roboweather/"""+latitude+""" /"""+longitude+""" '></iframe></div><h2>Location Video</h2><video width='320' height='240' controls autoplay src='/fishvid/temp"""+str(x)+""".mp4' type='video/mp4'></video>"""
+
+            yield """<h1>Submit a Fishing Report</h1><form action ='https://lftr.biz:8080/report' method='post'>Enter Report: <input type='text' name='report' value= 'date, observation, tips & tricks'><input name ='locnum' value=' """+str(x)+""" ' type='hidden'><input type='submit' value='Submit'> </form>"""
+
+            yield """<form enctype = 'multipart/form-data' action = 'https://lftr.biz:8084/uploader' method = 'post'><p>Upload File For The Location, ie. whats up on vid....(works on site, not app): <input type = 'file' name = 'file' /><input name ='f' value=' """+str(x)+""" ' type='hidden'></p><p><input type = 'submit' value = 'Upload' /></p><h3>FULL Report: </h3><h3> """+fullreport+weather+""" </h3></div>");"""
             yield """new maplibregl.Marker(el"""+str(x)+""" ).setLngLat(loc"""+str(x)+""" ).setPopup(popup"""+str(x)+""" ).addTo(map);"""
 ##continue JavaScript
 #for map states, layers and layer buttons
@@ -304,4 +319,3 @@ layers.appendChild(link);}});</script></body></html>"""
     return Response(output())
 if __name__ == "__main__":  
     app.run(host='0.0.0.0', debug=True, ssl_context=('/var/security/lftr.biz.crt', '/var/security/lftr.biz.key'), port=8080)
-
