@@ -36,6 +36,11 @@ app.url_map.strict_slashes = False
 @app.route('/roboweather/<lat>/<lng>')
 def fishmap(lat,lng):
     def output():
+
+
+
+
+
 #############################################################
 ####GFS 5Day Forecast
         url = 'http://thredds.ucar.edu/thredds/catalog/grib/NCEP/GFS/Global_0p25deg/catalog.xml?dataset=grib/NCEP/GFS/Global_0p25deg/Best'
@@ -65,6 +70,38 @@ def fishmap(lat,lng):
             r = ((d*10)/2.54)/60
             e.append((r))
         forecast = ['Date: '+str(m)+'    Temp(F): '+str(n)+'    Wind(mph): '+str(o)+'    Rain(in/hr): '+str(p) for m,n,o,p in zip(a,b,c,e)]
+#############################################################################
+##########HRRR FORECAST
+        url = 'https://thredds.ucar.edu/thredds/catalog/grib/NCEP/HRRR/CONUS_2p5km/catalog.html?dataset=grib/NCEP/HRRR/CONUS_2p5km/Best'
+        tds = catalog.TDSCatalog(url)
+        datasets = list(tds.datasets)
+        endpts = list(tds.datasets.values())
+        query1 = ncss.NCSS(endpts[0].access_urls['NetcdfSubset']).query().lonlat_point(str(lng), str(lat)).time_range(now, nowizzlot).variables('Temperature_height_above_ground')
+        query2 = ncss.NCSS(endpts[0].access_urls['NetcdfSubset']).query().lonlat_point(str(lng), str(lat)).time_range(now, nowizzlot).variables('Snow_depth_surface')
+        query3 = ncss.NCSS(endpts[0].access_urls['NetcdfSubset']).query().lonlat_point(str(lng), str(lat)).time_range(now, nowizzlot).variables('Lightning_entire_atmosphere')
+        query4 = ncss.NCSS(endpts[0].access_urls['NetcdfSubset']).query().lonlat_point(str(lng), str(lat)).time_range(now, nowizzlot).variables('Wind_speed_gust_surface')
+        data1 = ncss.NCSS(endpts[0].access_urls['NetcdfSubset']).get_data(query1)
+        data2 = ncss.NCSS(endpts[0].access_urls['NetcdfSubset']).get_data(query2)
+        data3 = ncss.NCSS(endpts[0].access_urls['NetcdfSubset']).get_data(query3)
+        data4 = ncss.NCSS(endpts[0].access_urls['NetcdfSubset']).get_data(query4)
+
+        f = []
+        g = []
+        h = []
+        i = []
+        k = []
+        for d in data1['time']:
+            f.append(str(d))
+        for d in data1['Temperature_height_above_ground']:
+            g.append(str((d-273.15)*(9/5)+32))
+        for d in data2['Snow_depth_surface']:
+            h.append(str(d*39.3701))
+        for d in data3['Lightning_entire_atmosphere']:
+            i.append(str(d))
+        for d in data4['Wind_speed_gust_surface']:
+            k.append(str(d))
+        forecast2 = ['Time: '+str(m)+'    Temp(F): '+str(n)+'    Snow Depth(inches): '+str(o)+'    Lightening: '+str(p)+'    Wind Speed Gust: '+str(q)+ '' for m,n,o,p,q in zip(f,g,b,c,e)]
+#############################################################################
 #############################################################################
 #waves
 ##newport beach 17th st
@@ -192,6 +229,9 @@ iframe#embed2
 <div><h2>    5 day JayT GFS Forecast:</h2></div>
 <marquee>"""+str(forecast)
         yield """</marquee>
+<h4></h4>
+<div><h2>    8 HOUR JayT HRRR and GFS combo Forecast: </h2></div>
+<marquee>"""+str(forecast2)+"""</marquee>
 <h4></h4>
 <div><h2>    5 day Wave Forecast(SURFING):</h2></div>
 <marquee>"""+str(waves)
