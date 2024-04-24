@@ -7,6 +7,7 @@ import json
 import subprocess
 import os
 import sys
+import random
 from datetime import date, datetime, timedelta
 import geopy
 from geopy.geocoders import Nominatim
@@ -14,29 +15,58 @@ from bs4 import BeautifulSoup
 from urllib.request import urlopen
 import geocoder
 from flask import Flask, Response, request, render_template, redirect, url_for
-
+from werkzeug.utils import secure_filename
+global rands
+rands = str(random.randrange(000, 999, 3))+'.mp4'
 app = Flask(__name__, static_folder='fishvid')
 app.url_map.strict_slashes = False
-@app.route('/report', methods=['GET', 'POST'])
-
-def report():
-    if request.method == 'POST':
+@app.route('/newloc', methods=['GET', 'POST'])
+def newloc():
+  try:
+      if request.method == 'POST':
         file = open("/var/www/fishloclist.csv", "r")
         csv_reader = csv.reader(file)
         loc = []
         for row in csv_reader:
             loc.append(row)
-        report = str(request.form['report'])
-        locnum = int(request.form['locnum'])
-        loc[locnum].append(report)
+        lng = str(request.form['lng'])
+        lat = str(request.form['lat'])
+        coord = (lat,lng,'')
+        loc.append(coord)
         with open('/var/www/fishloclist.csv', 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerows(loc)
-            print ('report submited. '+str(loc[locnum]))
-        return """<html><h1>Location:"""+str(locnum)+"""---"""+report+"""</h1></html>"""
-    else:
-        print ('none')
-            
+          writer = csv.writer(f)
+          writer.writerows(loc)
+          return """location submited"""+str(loc[-1])
+  except:
+    return """//"""
+@app.route('/report', methods=['GET', 'POST'])
+def report():
+  try:
+    if request.method == 'POST':
+      file = open("/var/www/fishloclist.csv", "r")
+      csv_reader = csv.reader(file)
+      loc = []
+      for row in csv_reader:
+          loc.append(row)
+      report = str(request.form['report'])
+      locnum = int(request.form['locnum'])
+      loc[locnum].append(report)
+      with open('/var/www/fishloclist.csv', 'w', newline='') as f:
+          writer = csv.writer(f)
+          writer.writerows(loc)
+          print ('report submited. '+str(loc[locnum]))
+      return """<html><h1>Location:"""+str(locnum)+"""---"""+report+"""</h1></html>"""
+  except:
+      return """ no report yet"""
+ 
+@app.route("/uploader", methods=["GET", "POST"])
+def upload_file():
+    if request.method == "POST":
+        f = request.files["file"]
+        locnum = request.form.get('f')
+        os.system('sudo cp /var/www/fishvid/temp'+str(locnum)+'.mp4 /var/www/fishvid/'+rands)
+        f.save(os.path.join('/var/www/fishvid/', secure_filename('temp'+str(locnum)+'.mp4')))
+    return "file uploaded successfully"            
 @app.route('/fishmap')
 def fishmap():
     def output():
@@ -195,7 +225,7 @@ text-align: center;}
             x=x+1
         yield """</div></div>"""
 #container for map
-        yield """<div id="container"><nav id="menu"></nav><div id="map" style="width: 100%; height: 100%;    opacity: 1;"></div></div>"""
+        yield """<pre id="info"></pre><div id="container"><nav id="menu"></nav><div id="map" style="width: 100%; height: 100%;    opacity: 1;"></div></div>"""
 ##javascript in html in python
         yield """<script>
 const where = {
@@ -279,10 +309,8 @@ showCompass: true
             yield """var loc"""+str(x)+""" = ["""+(longitude)+""" , """+(latitude)+"""];"""
             yield """var el"""+str(x)+""" = document.createElement('div');el"""+str(x)+""".id = 'marker';"""
             yield """var popup"""+str(x)+""" = new maplibregl.Popup({ offset: 25 }).setHTML("<div id='scroll'><h1>Location: ( """ +latitude+ """ , """ +longitude+ """ ) </h1><p> Report: """ +report+ """ </p><p>Current Weather: """ +weathershort+ """ </p><div id='containerpopup'><iframe id='popup' src='https://lftr.biz:8086/roboweather/"""+latitude+""" /"""+longitude+""" '></iframe></div><h2>Location Video</h2><video width='320' height='240' controls autoplay src='/fishvid/temp"""+str(x)+""".mp4' type='video/mp4'></video>"""
-
             yield """<h1>Submit a Fishing Report</h1><form action ='https://lftr.biz:8080/report' method='post'>Enter Report: <input type='text' name='report' value= 'date, observation, tips & tricks'><input name ='locnum' value=' """+str(x)+""" ' type='hidden'><input type='submit' value='Submit'> </form>"""
-
-            yield """<form enctype = 'multipart/form-data' action = 'https://lftr.biz:8084/uploader' method = 'post'><p>Upload File For The Location, ie. whats up on vid....(works on site, not app): <input type = 'file' name = 'file' /><input name ='f' value=' """+str(x)+""" ' type='hidden'></p><p><input type = 'submit' value = 'Upload' /></p><h3>FULL Report: </h3><h3> """+fullreport+weather+""" </h3></div>");"""
+            yield """<form enctype = 'multipart/form-data' action = 'https://lftr.biz:8080/uploader' method = 'post'><p>Upload File For The Location, ie. whats up on vid....(works on site, not app): <input type = 'file' name = 'file' /><input name ='f' value="""+str(x)+""" type='hidden'></p><p><input type = 'submit' value = 'Upload' /></p><h3>FULL Report: </h3><h3> """+fullreport+weather+""" </h3></div>");"""
             yield """new maplibregl.Marker(el"""+str(x)+""" ).setLngLat(loc"""+str(x)+""" ).setPopup(popup"""+str(x)+""" ).addTo(map);"""
 ##continue JavaScript
 #for map states, layers and layer buttons
@@ -315,7 +343,28 @@ clickedLayer,
 'visibility',
 'visible');}};
 const layers = document.getElementById('menu');
-layers.appendChild(link);}});</script></body></html>"""
+layers.appendChild(link);}});
+
+map.on('mousemove', (e) => {
+        document.getElementById('info').innerHTML =
+            // e.point is the x, y coordinates of the mousemove event relative
+            // to the top-left corner of the map
+            `${JSON.stringify(e.point)
+            }<br />${
+                // e.lngLat is the longitude, latitude geographical position of the event
+                JSON.stringify(e.lngLat.wrap())}`;
+    });
+
+map.on('click', (e) => {
+          var locx = [e.lngLat.lng , e.lngLat.lat];
+          var lat = e.lngLat.lng;
+          var lng = e.lngLat.lat;
+          var elx = document.createElement('div');elx.id = 'marker';
+          var popupx = new maplibregl.Popup().setHTML("<b><H1>Latitude:"+lng+"  Longitude:"+lat+"</h1></b><html><h1>Alert to a NEW FISHING LOC!!!</h1><form action ='https://lftr.biz:8080/newloc' method='post'>Enter Lat/Lng TO create a this location: <input type='text' name='lat'><input type='text' name='lng'><input type='submit' value='Submit'> </form><h1>Location Weather!!!</h1><iframe id='popup' src='https://lftr.biz:8086/roboweather/"+lng+"/"+lat+" '></iframe></html>").addTo(map);
+          new maplibregl.Marker(elx).setLngLat(locx).setPopup(popupx).addTo(map);   });
+
+
+</script></body></html>"""
     return Response(output())
 if __name__ == "__main__":  
     app.run(host='0.0.0.0', debug=True, ssl_context=('/var/security/lftr.biz.crt', '/var/security/lftr.biz.key'), port=8080)
